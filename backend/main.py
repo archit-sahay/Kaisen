@@ -33,6 +33,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://osrs_user:osrs_password@l
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 CACHE_TTL = int(os.getenv("CACHE_TTL", "300"))  # 5 minutes
 OSRS_API_TIMEOUT = int(os.getenv("OSRS_API_TIMEOUT", "30"))
+PORT = int(os.getenv("PORT", "8000"))  # Configurable port
 
 # Pydantic models
 class ItemResponse(BaseModel):
@@ -522,4 +523,4 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(socket_app, host="0.0.0.0", port=8000, log_level="info") 
+    uvicorn.run(socket_app, host="0.0.0.0", port=PORT, log_level="info") 
