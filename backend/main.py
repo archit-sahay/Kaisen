@@ -1,7 +1,7 @@
 """
 OSRS Price Tracker Backend
-User's Blueprint Implementation:
-- API fetches from PostgreSQL (source of truth)
+Architecture Implementation:
+- API fetches from PostgreSQL (source of truth)  
 - Frontend hits API on start + WebSocket connection
 - Backend caches DB data in Redis with TTL
 - Cache expiry triggers OSRS API check

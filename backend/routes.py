@@ -23,7 +23,7 @@ class APIRoutes:
 
     async def get_items(self) -> ItemsResponse:
         """
-        Main API endpoint - implements user's blueprint:
+        Main API endpoint - implements cache-driven architecture:
         - Fetches from PostgreSQL (source of truth)
         - Triggers cache check (non-blocking)
         - Returns data immediately

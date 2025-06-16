@@ -1,5 +1,5 @@
 // Socket.IO Hook for OSRS Price Tracker Frontend
-// Implements user's blueprint: Connect to WebSocket and listen for price updates
+// Implements real-time architecture: Connect to WebSocket and listen for price updates
 
 import { useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
