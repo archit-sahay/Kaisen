@@ -17,7 +17,7 @@ import socketio
 
 from config import PORT, CORS_ORIGINS
 from database import OSRSDataManager
-from websocket import sio, socket_manager
+from socket_manager import sio, socket_manager
 from routes import APIRoutes
 
 # Configure logging
