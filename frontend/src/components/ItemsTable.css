@@ -1,0 +1,330 @@
+/* ItemsTable.css - Styles for OSRS Price Tracker Table */
+
+.items-table-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Header Section */
+.table-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px;
+  border-radius: 12px 12px 0 0;
+  margin-bottom: 0;
+}
+
+.status-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.status-indicator {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-indicator.connected {
+  background-color: rgba(76, 175, 80, 0.2);
+  border: 2px solid #4CAF50;
+}
+
+.status-indicator.disconnected {
+  background-color: rgba(244, 67, 54, 0.2);
+  border: 2px solid #f44336;
+}
+
+.last-updated {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.items-count {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Filters */
+.filters {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search-input {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  min-width: 250px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.search-input:focus {
+  background: white;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+.filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  user-select: none;
+}
+
+.filter-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+/* Table Wrapper */
+.table-wrapper {
+  overflow-x: auto;
+  background: white;
+  border-radius: 0 0 12px 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Table Styles */
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  min-width: 800px;
+}
+
+.items-table thead {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+.items-table th {
+  padding: 15px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 2px solid #ddd;
+}
+
+.items-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.items-table th.sortable:hover {
+  background-color: rgba(103, 126, 234, 0.1);
+}
+
+.items-table td {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+  vertical-align: top;
+}
+
+.items-table tbody tr {
+  transition: background-color 0.2s;
+}
+
+.items-table tbody tr:hover {
+  background-color: #f8f9ff;
+}
+
+.items-table tbody tr.members-item {
+  border-left: 4px solid #ffd700;
+}
+
+.items-table tbody tr.f2p-item {
+  border-left: 4px solid #4CAF50;
+}
+
+/* Cell-specific styles */
+.item-name {
+  min-width: 200px;
+}
+
+.item-info strong {
+  color: #333;
+  font-weight: 600;
+}
+
+.item-examine {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.price-cell {
+  text-align: right;
+  min-width: 120px;
+}
+
+.price {
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  min-width: 80px;
+  text-align: center;
+}
+
+.price.high-price {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: #d32f2f;
+}
+
+.price.low-price {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: #388e3c;
+}
+
+.no-price {
+  color: #999;
+  font-style: italic;
+}
+
+.trend-cell {
+  text-align: center;
+  font-size: 18px;
+  width: 60px;
+}
+
+.members-cell {
+  text-align: center;
+  font-size: 18px;
+  width: 80px;
+}
+
+.alch-cell {
+  text-align: right;
+  color: #666;
+  min-width: 100px;
+}
+
+.timestamp-cell {
+  font-size: 12px;
+  color: #666;
+  min-width: 150px;
+}
+
+/* Loading States */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* No Results */
+.no-results {
+  text-align: center;
+  padding: 40px 20px;
+  background: white;
+  border-radius: 0 0 12px 12px;
+  color: #666;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .items-table-container {
+    padding: 10px;
+  }
+
+  .table-header {
+    padding: 15px;
+  }
+
+  .status-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .filters {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .search-input {
+    min-width: 200px;
+  }
+
+  .items-table {
+    font-size: 12px;
+  }
+
+  .items-table th,
+  .items-table td {
+    padding: 8px 6px;
+  }
+
+  .item-examine {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .items-table th:nth-child(n+6),
+  .items-table td:nth-child(n+6) {
+    display: none;
+  }
+} 
