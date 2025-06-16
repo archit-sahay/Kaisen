@@ -14,7 +14,12 @@ class APIRoutes:
 
     async def get_root(self):
         """Root endpoint"""
-        return {"message": "OSRS Price Tracker API", "status": "running"}
+        return {
+            "message": "OSRS Price Tracker API", 
+            "status": "running",
+            "author": "Archit Sahay",
+            "description": "Live updating RuneScape Grand Exchange prices"
+        }
 
     async def get_items(self) -> ItemsResponse:
         """

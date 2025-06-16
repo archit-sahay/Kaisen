@@ -1,6 +1,8 @@
 {
   "name": "osrs-price-tracker-frontend",
   "version": "1.0.0",
+  "author": "Archit Sahay",
+  "description": "React frontend for OSRS Price Tracker - Live updating RuneScape Grand Exchange prices",
   "private": true,
   "dependencies": {
     "@testing-library/jest-dom": "^5.17.0",

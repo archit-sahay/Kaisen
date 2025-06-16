@@ -8,6 +8,11 @@ User's Blueprint Implementation:
 - DB updates + WebSocket notify frontend to refetch
 """
 
+"""
+OSRS Price Tracker - Live updating RuneScape item prices
+Author: Archit Sahay
+"""
+
 import logging
 from contextlib import asynccontextmanager
 
@@ -53,7 +58,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="OSRS Price Tracker API",
-    description="Live updating RuneScape item prices with WebSocket notifications",
+    description="Live updating RuneScape item prices with WebSocket notifications - By Archit Sahay",
     version="1.0.0",
     lifespan=lifespan
 )

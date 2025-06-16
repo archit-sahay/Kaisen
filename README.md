@@ -1,4 +1,5 @@
 # 🏰 OSRS Price Tracker
+**Author: Archit Sahay**
 
 A real-time **Old School RuneScape (OSRS)** item price tracker that provides live Grand Exchange prices with automatic updates. Built with modern web technologies following a cache-driven architecture.
 
