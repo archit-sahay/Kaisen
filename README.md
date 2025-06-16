@@ -1,11 +1,11 @@
 # 🏰 OSRS Price Tracker
 **Author: Archit Sahay**
 
-A real-time **Old School RuneScape (OSRS)** item price tracker that provides live Grand Exchange prices with automatic updates. Built with modern web technologies following a cache-driven architecture.
+A real-time **Old School RuneScape (OSRS)** item price tracker that provides live Grand Exchange prices with automatic updates. Built with modern web technologies following an **event-driven architecture with Redis pub/sub**.
 
 ## 📋 Project Overview
 
-This application implements a **live updating price table** for OSRS items that automatically reflects the latest prices from the Grand Exchange, ensuring users always see up-to-date information without manual refresh.
+This application implements a **live updating price table** for OSRS items that automatically reflects the latest prices from the Grand Exchange, ensuring users always see up-to-date information without manual refresh. Features **proactive price monitoring** and **comprehensive logging** for complete market visibility.
 
 ## 📸 Live Application
 
@@ -20,32 +20,78 @@ This application implements a **live updating price table** for OSRS items that 
 - **💎 Price Analysis** - High/low prices, trends, and market indicators
 - **🏆 Item Categories** - Members vs Free-to-Play indicators
 - **📱 Responsive Design** - Works seamlessly on desktop and mobile
-- **⚡ Performance Optimized** - Efficient cache-driven updates
+- **⚡ Performance Optimized** - Efficient event-driven updates
+- **🔍 Enhanced Monitoring** - Detailed price tracking and system observability
+- **🚀 Proactive Updates** - Always fresh data regardless of user activity
 
-## 🏗️ Architecture Implementation
+## 🏗️ Event-Driven Architecture Implementation
 
-This project implements the **user's blueprint architecture**:
+This project implements an **event-driven architecture with Redis pub/sub**:
 
 ```
-React Frontend ←→ WebSocket ←→ FastAPI Backend ←→ Redis Cache ←→ PostgreSQL
-                     ↓              ↓
-                Live Updates    OSRS APIs
+React Frontend ←→ WebSocket ←→ FastAPI Backend ←→ Redis Pub/Sub ←→ PostgreSQL
+                     ↓              ↓                ↓
+                Live Updates    OSRS APIs       Event Triggers
 ```
 
-### 🔄 Core Flow (User's Blueprint)
+### 🔄 Core Flow (Event-Driven)
 
 1. **Frontend hits API on start** - React loads initial data from PostgreSQL
 2. **WebSocket connection established** - Real-time communication channel
-3. **Backend caches data in Redis** - 2-minute TTL for efficient updates
-4. **Cache expiry triggers OSRS API** - Automatic background price checking
+3. **Redis pub/sub monitoring** - Keyspace notifications for cache expiry events
+4. **Proactive OSRS API calls** - Automatic background price checking every 2 minutes
 5. **Database updates + WebSocket notify** - Changes trigger frontend refresh
+6. **Detailed logging** - Complete visibility into market activity and system performance
 
 ### 🧠 Efficient Update Strategy
 
+- **Event-driven updates** - Redis keyspace notifications trigger proactive monitoring
 - **Timestamp-based change detection** - Prevents unnecessary database operations
 - **Batch updates** - Efficient database writes for multiple items
-- **Database as source of truth** - Redis only for timing/caching
+- **Database as source of truth** - PostgreSQL for reliable data persistence
 - **Non-blocking updates** - Frontend remains responsive during updates
+- **Always fresh data** - Updates continue even with no user activity
+
+## 🔍 Enhanced Monitoring & Logging
+
+### 📈 **Real-Time Price Change Tracking**
+```
+📈 PRICE CHANGES DETECTED:
+  Item 2: High: 199 → 197 | Low: 197 → 192       (Cannonball)
+  Item 10: High: 177,607 → 184,995 | Low: 166,066 → 171,888 (Cannon barrels)
+  Item 41: Low: 29 → 28
+  ... and 1265 more items changed
+```
+
+### 📋 **Updated Items with Names**
+```
+📋 Sample updated items: Cannonball (ID: 2), Cannon base (ID: 6), Cannon stand (ID: 8)
+   ... and 1254 more items
+```
+
+### ⚙️ **System Performance Metrics**
+```
+✅ Retrieved 4162 items from OSRS API
+✅ Retrieved 4146 current prices from database
+📊 Updated 1275 items in database
+📡 Notified frontend via WebSocket about 1275 price changes
+🔄 Proactive update cycle completed - cache reset for next trigger in 2 minutes
+```
+
+### 🔍 **Live Monitoring Commands**
+```bash
+# Watch live price changes
+docker-compose logs backend -f | grep "PRICE CHANGES\|Item.*:"
+
+# Monitor system performance  
+docker-compose logs backend -f | grep "Retrieved\|Updated\|Notified"
+
+# Check for issues
+docker-compose logs backend -f | grep "ERROR\|WARNING\|❌\|⚠️"
+
+# Full monitoring dashboard
+docker-compose logs backend -f
+```
 
 ## 🚀 Quick Start
 
@@ -72,9 +118,10 @@ docker-compose up --build
 
 That's it! The application will:
 1. **Initialize database** with 4,276+ OSRS items mapping
-2. **Start Redis cache** with 2-minute TTL
-3. **Launch FastAPI backend** with WebSocket support
+2. **Start Redis pub/sub** with keyspace notifications
+3. **Launch FastAPI backend** with event-driven monitoring
 4. **Serve React frontend** with live updates
+5. **Begin proactive price monitoring** every 2 minutes
 
 ## 🏛️ Technical Stack
 
@@ -82,8 +129,9 @@ That's it! The application will:
 - **FastAPI** - Modern async Python web framework
 - **Socket.IO** - Real-time WebSocket communication
 - **PostgreSQL** - Reliable data persistence
-- **Redis** - High-performance caching layer
+- **Redis Pub/Sub** - Event-driven architecture with keyspace notifications
 - **AsyncPG** - Async PostgreSQL driver
+- **Enhanced Logging** - Comprehensive monitoring and observability
 
 ### Frontend
 - **React 18** - Modern UI library with hooks
@@ -95,6 +143,7 @@ That's it! The application will:
 - **Docker Compose** - Multi-service orchestration
 - **Health Checks** - Service monitoring
 - **CORS Configuration** - Cross-origin support
+- **Redis Keyspace Notifications** - Proactive event triggering
 
 ## 📊 Database Schema
 
@@ -130,9 +179,9 @@ CREATE TABLE prices (
 ## 🔌 API Endpoints
 
 ### Core Endpoints
-- `GET /api/items` - Fetch all items with prices (triggers cache check)
+- `GET /api/items` - Fetch all items with prices (always from PostgreSQL)
 - `GET /api/items/{id}` - Get specific item details
-- `GET /api/health` - System health and status
+- `GET /api/health` - System health, architecture type, and monitoring status
 - `Socket.IO /socket.io/` - Real-time price update notifications
 
 ### Socket.IO Events
@@ -163,10 +212,11 @@ socket.on('price_update', (data) => {
 - **Conditional rendering** to minimize DOM updates
 - **Responsive table** with virtual scrolling for large datasets
 
-### Cache Strategy
-- **Redis TTL control** determines API call frequency
-- **Database fallback** when cache is unavailable
-- **Memory cache backup** for Redis failures
+### Event-Driven Strategy
+- **Redis pub/sub keyspace notifications** trigger proactive updates
+- **TTL-based event scheduling** for consistent 2-minute cycles
+- **Database as single source of truth** for all data queries
+- **Graceful failure handling** maintains update cycles
 
 ## 🔧 Configuration
 
@@ -219,45 +269,81 @@ docker exec -it osrs-postgres psql -U osrs_user -d osrs_db -f /docker-entrypoint
 ```bash
 curl http://localhost:8000/api/health
 ```
+**Response includes:** Architecture type, connected clients, system status
 
-### Logs
+### Enhanced Logging & Monitoring
+```bash
+# Real-time price changes with item names
+docker-compose logs backend -f | grep "📈 PRICE CHANGES\|Item.*:"
+
+# System performance metrics
+docker-compose logs backend -f | grep "✅ Retrieved\|📊 Updated\|📡 Notified"
+
+# Monitor update cycles
+docker-compose logs backend -f | grep "🔄 Proactive update cycle"
+
+# Error monitoring
+docker-compose logs backend -f | grep "ERROR\|WARNING\|❌\|⚠️"
+```
+
+### Service Logs
 ```bash
 # View all services
 docker-compose logs -f
 
-# Specific service
+# Backend with enhanced logging
 docker-compose logs -f backend
+
+# Frontend logs
 docker-compose logs -f frontend
 ```
 
-### Redis Monitoring
+### Redis Pub/Sub Monitoring
 ```bash
 # Connect to Redis
 docker exec -it osrs-redis redis-cli
 
+# Monitor keyspace notifications
+> PSUBSCRIBE "__keyevent@0__:expired"
+
 # Check cache status
-> EXISTS items_cache
-> TTL items_cache
-> GET items_cache
+> EXISTS osrs_price_cache
+> TTL osrs_price_cache
+```
+
+### Market Activity Dashboard
+```bash
+# See which expensive items (1M+ GP) are changing
+docker-compose logs backend | grep "Item.*:" | grep -E "1,000,000|2,000,000"
+
+# Count price changes in last update
+docker-compose logs backend | grep "Detected changes" | tail -1
+
+# Monitor specific items (e.g., Dragon items)
+docker-compose logs backend | grep -i "dragon"
 ```
 
 ## 🎯 Key Implementation Highlights
 
-### User's Blueprint Faithfully Implemented ✅
+### Event-Driven Architecture Successfully Implemented ✅
 
 1. **✅ API fetches from PostgreSQL** - Database is always source of truth
 2. **✅ Frontend hits API on start** - Initial data load from DB
 3. **✅ WebSocket connection** - Real-time communication established
-4. **✅ Redis cache with expiry** - 2-minute TTL controls update timing
-5. **✅ Cache expiry triggers OSRS API** - Background price monitoring
-6. **✅ DB updates + WebSocket notify** - Changes propagate to frontend
+4. **✅ Redis pub/sub keyspace notifications** - Proactive event-driven updates
+5. **✅ TTL expiry triggers OSRS API** - Background price monitoring every 2 minutes
+6. **✅ DB updates + WebSocket notify** - Changes propagate to frontend instantly
 7. **✅ Frontend refetches on notification** - Live updates without refresh
+8. **✅ Enhanced logging** - Complete visibility into market activity and system performance
 
 ### Efficient & Scalable Design
 
 - **No DB explosion** - Timestamp comparison prevents unnecessary queries
 - **Batch operations** - Multiple updates in single transactions
 - **Non-blocking architecture** - Async operations maintain responsiveness
+- **Proactive monitoring** - Always fresh data regardless of user activity
+- **Event-driven updates** - Redis pub/sub eliminates polling overhead
+- **Comprehensive logging** - Production-ready observability and debugging
 - **Graceful error handling** - System continues operating during failures
 
 ## 🚀 Deployment
@@ -308,4 +394,4 @@ This project is for educational purposes. RuneScape is a trademark of Jagex Limi
 
 ---
 
-**🎯 Perfect implementation of the user's blueprint with modern web technologies!** 
+**🎯 Production-ready event-driven architecture with comprehensive monitoring and modern web technologies!** 
