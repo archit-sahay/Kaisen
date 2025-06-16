@@ -24,7 +24,7 @@ The OSRS Price Tracker is a **real-time web application** that monitors and disp
 
 ## 🏛️ System Architecture
 
-### Architecture Pattern: **Cache-Aside with Event-Driven Updates**
+### Architecture Pattern: **Event-Driven with Redis Pub/Sub**
 
 ```mermaid
 graph TB
@@ -59,7 +59,7 @@ graph TB
 
 ## 🔄 Data Flow Architecture
 
-### Primary Data Flow: **Cache-First Strategy**
+### Primary Data Flow: **Event-Driven Pub/Sub Strategy**
 
 ```mermaid
 sequenceDiagram
@@ -72,30 +72,23 @@ sequenceDiagram
     
     Note over F,W: Initial Load
     F->>A: GET /api/items
-    A->>R: Check cache expiry
-    alt Cache Valid
-        A->>D: Fetch from database
-        D-->>A: Return item data
-    else Cache Expired
-        A->>O: Fetch latest prices
-        O-->>A: Return price data
-        A->>D: Update database
-        A->>R: Reset cache TTL
-        A->>W: Notify price update
-        W-->>F: price_update event
-    end
+    A->>D: Fetch from database
+    D-->>A: Return item data
     A-->>F: Return data
     
-    Note over F,W: Real-time Updates
+    Note over F,W: Event-Driven Updates
     loop Every 2 minutes
-        A->>R: Check TTL expiry
+        R->>R: TTL expires automatically
+        R->>A: Keyspace notification (pub/sub)
         A->>O: Background API call
+        O-->>A: Return price data
         alt Prices Changed
             A->>D: Batch update
             A->>W: Broadcast update
             W-->>F: price_update event
             F->>A: Refetch data
         end
+        A->>R: Reset cache TTL
     end
 ```
 
@@ -278,13 +271,70 @@ if not exists("items_cache") or ttl("items_cache") < 0:
 GET /api/health
 {
     "status": "healthy",
-    "database": "connected",
-    "redis": "connected", 
-    "osrs_api": "responsive",
+    "database": "healthy",
+    "redis": "healthy", 
+    "architecture": "event-driven with Redis pub/sub",
+    "connected_clients": 0,
     "uptime": "2h 15m",
     "items_count": 4276,
     "last_update": "2024-01-15T10:30:00Z"
 }
+```
+
+### Enhanced Logging System
+
+The system provides comprehensive logging for monitoring real-time market activity and system performance.
+
+#### 🔄 **Update Cycle Logging**
+
+**Full Cycle Example:**
+```
+INFO:database:Cache expiry event received - triggering proactive price update
+INFO:database:Starting proactive OSRS API update cycle
+INFO:database:✅ Retrieved 4162 items from OSRS API
+INFO:database:✅ Retrieved 4146 current prices from database
+INFO:database:Detected changes in 1275/4162 items
+```
+
+#### 📈 **Detailed Price Change Tracking**
+
+**Price Movement Examples:**
+```
+INFO:database:📈 PRICE CHANGES DETECTED:
+INFO:database:  Item 2: High: 199 → 197 | Low: 197 → 192       (Cannonball)
+INFO:database:  Item 10: High: 177,607 → 184,995 | Low: 166,066 → 171,888 (Cannon barrels)
+INFO:database:  Item 41: Low: 29 → 28
+INFO:database:  ... and 1265 more items changed
+```
+
+#### 📋 **Item Name Resolution**
+
+**Updated Items with Names:**
+```
+INFO:database:💾 Successfully updated prices for 1259 items in database
+INFO:database:📋 Sample updated items: Cannonball (ID: 2), Cannon base (ID: 6), Cannon stand (ID: 8)
+INFO:database:   ... and 1254 more items
+```
+
+#### ⚙️ **System Performance Metrics**
+
+**WebSocket & Database Operations:**
+```
+INFO:database:📊 Updated 1275 items in database
+INFO:socket_manager:Notified 1 clients about 1275 price updates
+INFO:database:📡 Notified frontend via WebSocket about 1275 price changes
+INFO:database:🔄 Proactive update cycle completed - cache reset for next trigger in 2 minutes
+```
+
+#### 🚫 **No Changes Scenario**
+
+**When Market is Stable:**
+```
+INFO:database:✅ Retrieved 4162 items from OSRS API
+INFO:database:✅ Retrieved 4146 current prices from database
+INFO:database:Detected changes in 0/4162 items
+INFO:database:✅ No price changes detected - database and frontend remain unchanged
+INFO:database:🔄 Proactive update cycle completed - cache reset for next trigger in 2 minutes
 ```
 
 ### Key Metrics to Monitor
@@ -293,6 +343,24 @@ GET /api/health
 - **Database Query Time** - Data layer performance
 - **Cache Hit Rate** - Cache effectiveness
 - **OSRS API Errors** - External dependency health
+- **Price Change Frequency** - Market activity levels
+- **Item Update Counts** - Database write efficiency
+
+### Live Monitoring Commands
+
+```bash
+# Follow all backend logs
+docker-compose logs backend -f
+
+# Filter for price changes only
+docker-compose logs backend | grep "PRICE CHANGES\|Item.*:"
+
+# Monitor system performance
+docker-compose logs backend | grep "Retrieved\|Updated\|Notified"
+
+# Check error rates
+docker-compose logs backend | grep "ERROR\|WARNING"
+```
 
 ## 🏗️ Deployment Architecture
 

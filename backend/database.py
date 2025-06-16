@@ -202,8 +202,11 @@ class OSRSDataManager:
                 self._set_cache_with_expiry()
                 return
             
+            logger.info(f"✅ Retrieved {len(latest_prices)} items from OSRS API")
+            
             # Step 2: Get current prices from DB for efficient comparison
             current_prices = await self._get_current_prices_for_comparison()
+            logger.info(f"✅ Retrieved {len(current_prices)} current prices from database")
             
             # Step 3: Detect changes (efficient, no DB explosion)
             updated_items = self._detect_price_changes(current_prices, latest_prices)
@@ -211,23 +214,27 @@ class OSRSDataManager:
             if updated_items:
                 # Step 4: Batch update database
                 await self._batch_update_prices(updated_items)
-                logger.info(f"Updated {len(updated_items)} items in database")
+                logger.info(f"📊 Updated {len(updated_items)} items in database")
                 
                 # Step 5: Notify frontend via WebSocket
                 if self.socket_manager:
                     await self.socket_manager.notify_price_updates(list(updated_items.keys()))
+                    logger.info(f"📡 Notified frontend via WebSocket about {len(updated_items)} price changes")
+                else:
+                    logger.warning("Socket manager not available - skipping WebSocket notification")
             else:
-                logger.info("No price changes detected")
+                logger.info("✅ No price changes detected - database and frontend remain unchanged")
             
             # Step 6: Reset cache key for next expiry cycle
             self._set_cache_with_expiry()
             
-            logger.info("Proactive update cycle completed - cache reset for next trigger")
+            logger.info("🔄 Proactive update cycle completed - cache reset for next trigger in 2 minutes")
             
         except Exception as e:
-            logger.error(f"OSRS API update failed: {e}")
+            logger.error(f"❌ OSRS API update failed: {e}")
             # Always reset cache to maintain update cycle
             self._set_cache_with_expiry()
+            logger.info("🔄 Cache reset despite error - maintaining update cycle")
     
     async def _fetch_osrs_latest_prices(self) -> Dict:
         """Fetch latest prices from OSRS API"""
@@ -307,6 +314,7 @@ class OSRSDataManager:
     def _detect_price_changes(self, current_prices: Dict, latest_prices: Dict) -> Dict:
         """Efficient change detection using timestamps (prevents DB explosion)"""
         updated_items = {}
+        change_details = []
         
         for item_id, latest_data in latest_prices.items():
             current_data = current_prices.get(item_id, {})
@@ -322,25 +330,66 @@ class OSRSDataManager:
             if (latest_high_time > current_high_time or 
                 latest_low_time > current_low_time):
                 updated_items[item_id] = latest_data
+                
+                # Collect detailed change information for logging
+                change_info = {
+                    'item_id': item_id,
+                    'high_price_old': current_data.get('high_price'),
+                    'high_price_new': latest_data.get('high'),
+                    'low_price_old': current_data.get('low_price'),
+                    'low_price_new': latest_data.get('low'),
+                    'high_time_old': current_high_time,
+                    'high_time_new': latest_high_time,
+                    'low_time_old': current_low_time,
+                    'low_time_new': latest_low_time
+                }
+                change_details.append(change_info)
         
+        # Log summary
         logger.info(f"Detected changes in {len(updated_items)}/{len(latest_prices)} items")
+        
+        # Log detailed changes for first few items (to avoid log spam)
+        if change_details:
+            logger.info("📈 PRICE CHANGES DETECTED:")
+            for i, change in enumerate(change_details[:10]):  # Log first 10 changes
+                # Format price changes
+                high_change = ""
+                low_change = ""
+                
+                if change['high_time_new'] > change['high_time_old']:
+                    old_high = change['high_price_old'] or 0
+                    new_high = change['high_price_new'] or 0
+                    high_change = f"High: {old_high:,} → {new_high:,}"
+                
+                if change['low_time_new'] > change['low_time_old']:
+                    old_low = change['low_price_old'] or 0
+                    new_low = change['low_price_new'] or 0
+                    low_change = f"Low: {old_low:,} → {new_low:,}"
+                
+                changes_str = " | ".join(filter(None, [high_change, low_change]))
+                logger.info(f"  Item {change['item_id']}: {changes_str}")
+            
+            if len(change_details) > 10:
+                logger.info(f"  ... and {len(change_details) - 10} more items changed")
+        
         return updated_items
     
     async def _batch_update_prices(self, updated_items: Dict):
         """Batch update prices in database (efficient, no explosion)"""
         async with self.db_pool.acquire() as conn:
             
-            # Get valid item IDs to filter out foreign key violations
-            valid_item_ids = set()
-            rows = await conn.fetch("SELECT id FROM items")
-            valid_item_ids = {str(row['id']) for row in rows}
+            # Get valid item IDs and names to filter out foreign key violations
+            valid_item_data = {}
+            rows = await conn.fetch("SELECT id, name FROM items")
+            valid_item_data = {str(row['id']): row['name'] for row in rows}
             
             # Prepare batch data - only for items that exist in our database
             update_data = []
+            updated_item_names = []
             filtered_count = 0
             
             for item_id, data in updated_items.items():
-                if item_id in valid_item_ids:
+                if item_id in valid_item_data:
                     update_data.append((
                         int(item_id),
                         data.get('high'),
@@ -348,11 +397,12 @@ class OSRSDataManager:
                         data.get('low'),
                         data.get('lowTime')
                     ))
+                    updated_item_names.append(f"{valid_item_data[item_id]} (ID: {item_id})")
                 else:
                     filtered_count += 1
             
             if filtered_count > 0:
-                logger.info(f"Filtered out {filtered_count} items not in our database")
+                logger.info(f"⚠️  Filtered out {filtered_count} items not in our database")
             
             if update_data:
                 # Batch update with single query
@@ -367,9 +417,17 @@ class OSRSDataManager:
                         low_time = EXCLUDED.low_time,
                         last_updated = EXCLUDED.last_updated
                 """, update_data)
-                logger.info(f"Successfully updated prices for {len(update_data)} items")
+                
+                logger.info(f"💾 Successfully updated prices for {len(update_data)} items in database")
+                
+                # Log some example item names that were updated (first 5)
+                if updated_item_names:
+                    sample_items = updated_item_names[:5]
+                    logger.info(f"📋 Sample updated items: {', '.join(sample_items)}")
+                    if len(updated_item_names) > 5:
+                        logger.info(f"   ... and {len(updated_item_names) - 5} more items")
             else:
-                logger.warning("No valid items to update prices for")
+                logger.warning("⚠️  No valid items to update prices for")
 
     async def get_item_by_id(self, item_id: int) -> Optional[Dict]:
         """Get specific item by ID from database"""

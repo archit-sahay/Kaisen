@@ -153,30 +153,14 @@ Time-based Schedule → Regular Updates → Always Fresh Data  ✅
 
 ### Q: Are we using Redis pub/sub?
 
-**A: NO - We're using simple TTL expiry checks.**
+**A: YES - Event-driven architecture with keyspace notifications!**
 
-**Current Mechanism:**
-- Set key with TTL: `SETEX items_cache 120 "data"`
-- Check expiry: `EXISTS items_cache` → if false, TTL expired
-- Very simple but has the "no activity = stale data" problem
-
-**Pub/Sub Would Be Better:**
+**Updated Architecture:**
 - Redis keyspace notifications for expired keys
 - Proactive updates regardless of user activity
 - True event-driven architecture
 
-## 🛠️ Proposed Solutions
-
-### Option 1: Backend Scheduled Task
-```python
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-
-@scheduler.scheduled_job('interval', minutes=2)
-async def periodic_price_update():
-    await data_manager._update_from_osrs_api()
-```
-
-### Option 2: Redis Keyspace Notifications
+**Implementation:**
 ```python
 # Enable expiry notifications
 redis_client.config_set('notify-keyspace-events', 'Ex')
@@ -186,13 +170,61 @@ pubsub = redis_client.pubsub()
 pubsub.psubscribe('__keyevent@0__:expired')
 ```
 
-### Option 3: Frontend Periodic Polling
-```typescript
-useEffect(() => {
-    const interval = setInterval(fetchItems, 2 * 60 * 1000);
-    return () => clearInterval(interval);
-}, []);
+## 📊 Enhanced Logging & Monitoring
+
+### Q: What detailed information can I see in the backend logs?
+
+**A: Comprehensive price change tracking with item names and specific price movements!**
+
+**Enhanced Logging Features:**
+
+1. **📈 Detailed Price Changes:**
 ```
+📈 PRICE CHANGES DETECTED:
+  Item 2: High: 199 → 197 | Low: 197 → 192       (Cannonball)
+  Item 10: High: 177,607 → 184,995 | Low: 166,066 → 171,888 (Cannon barrels)
+  Item 41: Low: 29 → 28
+  ... and 1265 more items changed
+```
+
+2. **📋 Sample Updated Items:**
+```
+📋 Sample updated items: Cannonball (ID: 2), Cannon base (ID: 6), Cannon stand (ID: 8)
+   ... and 1254 more items
+```
+
+3. **⚙️ System Performance Metrics:**
+```
+✅ Retrieved 4162 items from OSRS API
+✅ Retrieved 4146 current prices from database
+📊 Updated 1275 items in database
+📡 Notified frontend via WebSocket about 1275 price changes
+🔄 Proactive update cycle completed - cache reset for next trigger in 2 minutes
+```
+
+4. **🚫 No Changes Detected:**
+```
+✅ No price changes detected - database and frontend remain unchanged
+```
+
+### Q: How can I monitor real-time price changes?
+
+**A: Watch the backend logs for live market activity:**
+
+```bash
+# Follow live logs
+docker-compose logs backend -f
+
+# Filter for price changes only
+docker-compose logs backend | grep "PRICE CHANGES\|Item.*:"
+```
+
+**What You'll See:**
+- **Exact price movements** (old price → new price)
+- **Item names** with IDs for easy identification
+- **High/Low price updates** separately tracked
+- **Market activity levels** (how many items changed)
+- **System efficiency** (API calls vs actual updates)
 
 ## 📊 Performance & Design
 
@@ -232,7 +264,7 @@ def _detect_price_changes(self, current_prices: Dict, latest_prices: Dict) -> Di
 ```
 Frontend Request → PostgreSQL (immediate response)
                      ↓
-                Background: Redis TTL Check
+                Background: Redis Pub/Sub TTL Monitor
                      ↓
                 If Expired: OSRS API → DB Update → WebSocket Notify
                      ↓
@@ -241,11 +273,12 @@ Frontend Request → PostgreSQL (immediate response)
 
 **Key Architecture Principles:**
 - **Database = Source of Truth** (always fresh data)
-- **Redis = Timer Only** (not data storage)
+- **Redis = Event Coordinator** (pub/sub notifications)
 - **Non-blocking Updates** (frontend never waits)
 - **Efficient Change Detection** (timestamp comparison)
 - **Real-time Notifications** (WebSocket push updates)
+- **Detailed Logging** (comprehensive monitoring)
 
 ---
 
-*This FAQ documents the current architecture and identifies areas for improvement, particularly around proactive price updates and event-driven design patterns.* 
+*This FAQ documents the current event-driven architecture with enhanced logging capabilities for comprehensive price monitoring and system observability.* 
