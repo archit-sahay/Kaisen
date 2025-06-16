@@ -7,6 +7,12 @@ A real-time **Old School RuneScape (OSRS)** item price tracker that provides liv
 
 This application implements a **live updating price table** for OSRS items that automatically reflects the latest prices from the Grand Exchange, ensuring users always see up-to-date information without manual refresh.
 
+## 📸 Live Application
+
+![OSRS Price Tracker Interface](screenshots/app-preview.png)
+
+*The live application showing 4,276+ OSRS items with real-time Grand Exchange prices, including expensive 3rd age items worth billions of GP*
+
 ### 🎯 Key Features
 
 - **📊 Live Price Updates** - Real-time price notifications via WebSocket
