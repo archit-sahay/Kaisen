@@ -17,4 +17,9 @@ DB_MAX_CONNECTIONS = 20
 DB_COMMAND_TIMEOUT = 60
 
 # WebSocket settings
-CORS_ORIGINS = ["http://localhost:3000", "http://frontend:3000"] 
+CORS_ORIGINS = ["http://localhost:3000", "http://frontend:3000"]
+
+# Redis Pub/Sub settings for event-driven architecture
+REDIS_KEYSPACE_NOTIFICATIONS = "Ex"  # Enable expiry events
+CACHE_EXPIRY_CHANNEL = "__keyevent@0__:expired"
+CACHE_KEY_NAME = "osrs_price_cache" 

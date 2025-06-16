@@ -12,7 +12,8 @@ import redis
 from config import (
     DATABASE_URL, REDIS_URL, CACHE_TTL, OSRS_API_TIMEOUT,
     OSRS_PRICES_API_URL, OSRS_MAPPING_API_URL,
-    DB_MIN_CONNECTIONS, DB_MAX_CONNECTIONS, DB_COMMAND_TIMEOUT
+    DB_MIN_CONNECTIONS, DB_MAX_CONNECTIONS, DB_COMMAND_TIMEOUT,
+    REDIS_KEYSPACE_NOTIFICATIONS, CACHE_EXPIRY_CHANNEL, CACHE_KEY_NAME
 )
 
 logger = logging.getLogger(__name__)
@@ -21,12 +22,14 @@ class OSRSDataManager:
     def __init__(self):
         self.db_pool: Optional[asyncpg.Pool] = None
         self.redis_client: Optional[redis.Redis] = None
+        self.redis_pubsub: Optional[redis.client.PubSub] = None
         self.api_session: Optional[aiohttp.ClientSession] = None
         self.socket_manager: Optional['SocketManager'] = None
         self._update_lock = asyncio.Lock()
+        self._pubsub_task: Optional[asyncio.Task] = None
         
     async def init_connections(self):
-        """Initialize all connections"""
+        """Initialize all connections and enable Redis pub/sub"""
         # Database connection pool
         self.db_pool = await asyncpg.create_pool(
             DATABASE_URL,
@@ -37,6 +40,13 @@ class OSRSDataManager:
         
         # Redis connection (sync)
         self.redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+        
+        # Enable Redis keyspace notifications for expired events
+        self._enable_keyspace_notifications()
+        
+        # Setup pub/sub for cache expiry events
+        self.redis_pubsub = self.redis_client.pubsub()
+        self._setup_pubsub_listener()
         
         # Create custom SSL context for OSRS API
         ssl_context = ssl.create_default_context()
@@ -51,10 +61,23 @@ class OSRSDataManager:
             connector=connector
         )
         
-        logger.info("All connections initialized successfully")
+        logger.info("All connections initialized successfully with Redis pub/sub")
         
     async def close_connections(self):
         """Clean up all connections"""
+        # Stop pub/sub listener
+        if self._pubsub_task and not self._pubsub_task.done():
+            self._pubsub_task.cancel()
+            try:
+                await self._pubsub_task
+            except asyncio.CancelledError:
+                pass
+        
+        # Close Redis pub/sub
+        if self.redis_pubsub:
+            self.redis_pubsub.close()
+        
+        # Close other connections
         if self.db_pool:
             await self.db_pool.close()
         if self.api_session:
@@ -63,8 +86,55 @@ class OSRSDataManager:
             self.redis_client.close()
         logger.info("All connections closed")
     
+    def _enable_keyspace_notifications(self):
+        """Enable Redis keyspace notifications for expired events"""
+        try:
+            self.redis_client.config_set('notify-keyspace-events', REDIS_KEYSPACE_NOTIFICATIONS)
+            logger.info("Redis keyspace notifications enabled for expired events")
+        except Exception as e:
+            logger.error(f"Failed to enable keyspace notifications: {e}")
+    
+    def _setup_pubsub_listener(self):
+        """Setup Redis pub/sub listener for cache expiry events"""
+        try:
+            # Subscribe to expiry events pattern
+            self.redis_pubsub.psubscribe(CACHE_EXPIRY_CHANNEL)
+            logger.info(f"Subscribed to Redis expiry events: {CACHE_EXPIRY_CHANNEL}")
+        except Exception as e:
+            logger.error(f"Failed to setup pub/sub listener: {e}")
+    
+    async def start_pubsub_listener(self):
+        """Start background task to listen for Redis pub/sub messages"""
+        self._pubsub_task = asyncio.create_task(self._pubsub_message_handler())
+        logger.info("Started Redis pub/sub listener for proactive price updates")
+    
+    async def _pubsub_message_handler(self):
+        """Handle Redis pub/sub messages for cache expiry events"""
+        try:
+            # Use run_in_executor for blocking Redis operations
+            while True:
+                message = await asyncio.get_event_loop().run_in_executor(
+                    None, self.redis_pubsub.get_message, 1.0
+                )
+                
+                if message and message['type'] == 'pmessage':
+                    # Extract the expired key name
+                    expired_key = message['data']
+                    
+                    if expired_key == CACHE_KEY_NAME:
+                        logger.info("Cache expiry event received - triggering proactive price update")
+                        
+                        # Use lock to prevent concurrent updates
+                        async with self._update_lock:
+                            await self._update_from_osrs_api()
+                            
+        except asyncio.CancelledError:
+            logger.info("Pub/sub listener cancelled")
+        except Exception as e:
+            logger.error(f"Pub/sub message handler error: {e}")
+    
     async def startup_cache_population(self):
-        """Populate Redis cache on startup with DB data"""
+        """Populate Redis cache on startup and start pub/sub listener"""
         try:
             logger.info("Populating startup cache from database")
             
@@ -74,26 +144,25 @@ class OSRSDataManager:
             # Get all items from database
             items = await self._get_all_items_from_db()
             
-            # Cache in Redis with TTL
-            self.redis_client.setex(
-                "items_cache",
-                CACHE_TTL,
-                json.dumps(items, default=str)
-            )
+            # Set cache with TTL (this will trigger pub/sub when it expires)
+            self._set_cache_with_expiry()
             
-            logger.info(f"Cached {len(items)} items on startup")
+            # Start the pub/sub listener for proactive updates
+            await self.start_pubsub_listener()
+            
+            logger.info(f"Event-driven architecture initialized with {len(items)} items")
             
         except Exception as e:
             logger.error(f"Startup cache population failed: {e}")
     
     async def get_items_from_db(self) -> List[Dict]:
-        """Main method: Get items from DB (source of truth) + trigger cache check"""
+        """Main method: Get items from DB (source of truth) - no more manual cache checks needed"""
         
-        # Step 1: Always get from database (source of truth)
+        # Always get from database (source of truth)
         items = await self._get_all_items_from_db()
         
-        # Step 2: Check cache and trigger update if needed (non-blocking)
-        asyncio.create_task(self._check_cache_and_update())
+        # No more manual cache checking - pub/sub handles this proactively!
+        logger.debug("Data served from database - pub/sub handles cache expiry automatically")
         
         return items
     
@@ -106,34 +175,31 @@ class OSRSDataManager:
             """)
             return [dict(row) for row in rows]
     
-    async def _check_cache_and_update(self):
-        """Check if cache expired and trigger OSRS API update if needed"""
+    def _set_cache_with_expiry(self):
+        """Set cache key with TTL - expiry will trigger pub/sub event"""
         try:
-            # Check if cache exists
-            cache_exists = self.redis_client.exists("items_cache")
-            
-            if not cache_exists:
-                logger.info("Cache expired - triggering OSRS API update")
-                
-                # Use lock to prevent multiple concurrent updates
-                async with self._update_lock:
-                    # Double-check cache (another request might have updated)
-                    if not self.redis_client.exists("items_cache"):
-                        await self._update_from_osrs_api()
-                        
+            # Set a simple marker key that will expire and trigger pub/sub
+            self.redis_client.setex(
+                CACHE_KEY_NAME,
+                CACHE_TTL,
+                json.dumps({"last_update": datetime.now().isoformat()})
+            )
+            logger.info(f"Cache key set with {CACHE_TTL}s TTL - pub/sub will handle expiry")
         except Exception as e:
-            logger.warning(f"Cache check failed: {e}")
+            logger.warning(f"Failed to set cache key: {e}")
     
     async def _update_from_osrs_api(self):
-        """Core update logic: OSRS API -> Compare -> Update DB -> Notify"""
+        """Core update logic: OSRS API -> Compare -> Update DB -> Notify -> Reset Cache"""
         try:
-            logger.info("Starting OSRS API update cycle")
+            logger.info("Starting proactive OSRS API update cycle")
             
             # Step 1: Fetch latest prices from OSRS API
             latest_prices = await self._fetch_osrs_latest_prices()
             
             if not latest_prices:
                 logger.warning("No data from OSRS API")
+                # Reset cache even if API fails to maintain the update cycle
+                self._set_cache_with_expiry()
                 return
             
             # Step 2: Get current prices from DB for efficient comparison
@@ -153,11 +219,15 @@ class OSRSDataManager:
             else:
                 logger.info("No price changes detected")
             
-            # Step 6: Refresh cache with updated data
-            await self._refresh_cache()
+            # Step 6: Reset cache key for next expiry cycle
+            self._set_cache_with_expiry()
+            
+            logger.info("Proactive update cycle completed - cache reset for next trigger")
             
         except Exception as e:
             logger.error(f"OSRS API update failed: {e}")
+            # Always reset cache to maintain update cycle
+            self._set_cache_with_expiry()
     
     async def _fetch_osrs_latest_prices(self) -> Dict:
         """Fetch latest prices from OSRS API"""
@@ -300,19 +370,6 @@ class OSRSDataManager:
                 logger.info(f"Successfully updated prices for {len(update_data)} items")
             else:
                 logger.warning("No valid items to update prices for")
-    
-    async def _refresh_cache(self):
-        """Refresh Redis cache with latest data from DB"""
-        try:
-            items = await self._get_all_items_from_db()
-            self.redis_client.setex(
-                "items_cache",
-                CACHE_TTL,
-                json.dumps(items, default=str)
-            )
-            logger.info("Cache refreshed with latest data")
-        except Exception as e:
-            logger.warning(f"Cache refresh failed: {e}")
 
     async def get_item_by_id(self, item_id: int) -> Optional[Dict]:
         """Get specific item by ID from database"""

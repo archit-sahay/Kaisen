@@ -18,15 +18,15 @@ class APIRoutes:
             "message": "OSRS Price Tracker API", 
             "status": "running",
             "author": "Archit Sahay",
-            "description": "Live updating RuneScape Grand Exchange prices"
+            "description": "Live updating RuneScape Grand Exchange prices with Event-Driven Redis Pub/Sub"
         }
 
     async def get_items(self) -> ItemsResponse:
         """
-        Main API endpoint - implements cache-driven architecture:
+        Main API endpoint - implements event-driven architecture:
         - Fetches from PostgreSQL (source of truth)
-        - Triggers cache check (non-blocking)
-        - Returns data immediately
+        - Redis pub/sub handles proactive price updates
+        - Returns data immediately without manual cache checks
         """
         try:
             items = await self.data_manager.get_items_from_db()
@@ -84,6 +84,7 @@ class APIRoutes:
             "status": "healthy" if (db_healthy and redis_healthy) else "unhealthy",
             "database": "healthy" if db_healthy else "unhealthy",
             "redis": "healthy" if redis_healthy else "unhealthy",
+            "architecture": "event-driven with Redis pub/sub",
             "connected_clients": connected_clients,
             "timestamp": datetime.now(timezone(timedelta(hours=0))).isoformat()
         } 

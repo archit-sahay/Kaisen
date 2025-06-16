@@ -1,10 +1,10 @@
 """
 OSRS Price Tracker Backend
-Architecture Implementation:
+Event-Driven Architecture Implementation:
 - API fetches from PostgreSQL (source of truth)  
 - Frontend hits API on start + WebSocket connection
-- Backend caches DB data in Redis with TTL
-- Cache expiry triggers OSRS API check
+- Redis pub/sub triggers proactive OSRS API updates
+- Cache expiry events drive price update cycles
 - DB updates + WebSocket notify frontend to refetch
 """
 
@@ -40,12 +40,12 @@ async def lifespan(app: FastAPI):
     """Handle application startup and shutdown"""
     
     # Startup
-    logger.info("Starting OSRS Price Tracker Backend...")
+    logger.info("Starting OSRS Price Tracker Backend with Event-Driven Architecture...")
     
     try:
         await data_manager.init_connections()
         await data_manager.startup_cache_population()
-        logger.info("Backend started successfully")
+        logger.info("Backend started successfully with Redis pub/sub")
         
         yield  # Application runs here
         
@@ -58,8 +58,8 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="OSRS Price Tracker API",
-    description="Live updating RuneScape item prices with WebSocket notifications - By Archit Sahay",
-    version="1.0.0",
+    description="Live updating RuneScape item prices with Event-Driven Redis Pub/Sub - By Archit Sahay",
+    version="2.0.0",
     lifespan=lifespan
 )
 

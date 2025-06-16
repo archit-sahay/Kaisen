@@ -1,5 +1,5 @@
 // Items Hook for OSRS Price Tracker Frontend
-// Implements cache-driven architecture:
+// Implements event-driven architecture:
 // 1. Fetch from API on start
 // 2. Listen to Socket.IO updates
 // 3. Refetch when backend notifies about price changes
@@ -47,7 +47,7 @@ export const useItems = (): UseItemsReturn => {
     fetchItems();
   }, [fetchItems]);
 
-  // Listen for socket updates and refetch (cache-driven updates)
+  // Listen for socket updates and refetch (event-driven updates)
   useEffect(() => {
     if (lastUpdate) {
       console.log(`📈 Socket update received: ${lastUpdate.count} items changed`);

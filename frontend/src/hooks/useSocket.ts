@@ -38,7 +38,7 @@ export const useSocket = (): UseSocketReturn => {
       });
     });
 
-    newSocket.on('disconnect', (reason) => {
+    newSocket.on('disconnect', (reason: any) => {
       console.log('✗ Disconnected from Socket.IO server:', reason);
       setIsConnected(false);
       setConnectionStatus({
@@ -48,7 +48,7 @@ export const useSocket = (): UseSocketReturn => {
       });
     });
 
-    newSocket.on('connect_error', (error) => {
+    newSocket.on('connect_error', (error: any) => {
       console.error('Socket.IO connection error:', error);
       setConnectionStatus({
         connected: false,
@@ -58,7 +58,7 @@ export const useSocket = (): UseSocketReturn => {
     });
 
     // Server confirmation
-    newSocket.on('connected', (data) => {
+    newSocket.on('connected', (data: any) => {
       console.log('Server confirmation:', data);
       setConnectionStatus({
         connected: true,
